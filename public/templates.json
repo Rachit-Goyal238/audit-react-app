@@ -1,0 +1,31 @@
+{
+    "TATA Capital": {
+        "Collection": "templates/TATA Capital/TATA_Collection_Agency_Template_2026-27.xlsx",
+        "Repossesion": "templates/TATA Capital/TATA_Repo_Agency_Template_2026-27.xlsx",
+        "Collection And Repossesion": "templates/TATA Capital/TATA_Collection_and_Repo_Agency_Template_2026-27.xlsx",
+        "Stockyard": "templates/TATA Capital/TATA_Stockyard_Agency_Template_2026-27.xlsx"
+    },
+
+    "YesBank": {
+        "Collection": "templates/YesBank/YesBank_Collection_Template_2026-27.xlsx",
+        "Repossesion": "templates/YesBank/YesBank_Repossesion_Template_2026-27.xlsx",
+        "Stockyard": "templates/YesBank/YesBank_Stockyard_Template_2026-27.xlsx"
+
+    },
+
+    "Client 3": {
+
+    },
+    
+    "Client 4": {
+
+    },
+    
+    "Client 5": {
+
+    },
+    
+    "Client 6": {
+
+    }
+}
