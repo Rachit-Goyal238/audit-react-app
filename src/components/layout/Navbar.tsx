@@ -1,84 +1,46 @@
-import { Link, useLocation } from 'react-router-dom';
-import { FileSpreadsheet, Server, Sparkles, Sliders, BookOpen } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { useAudit } from '@/context/AuditContext';
+import { Link } from 'react-router-dom';
+import { SettingsDialog } from './SettingsDialog';
 
 export function Navbar() {
-  const location = useLocation();
-  const { settings } = useAudit();
-
-  const navItems = [
-    { label: 'Audit Generator', path: '/', icon: FileSpreadsheet },
-    { label: 'Templates & Specs', path: '/templates', icon: Sparkles },
-    { label: 'Cloud Run & Gotenberg', path: '/settings', icon: Server },
-    { label: 'Architecture Guide', path: '/architecture', icon: BookOpen },
-  ];
-
   return (
-    <header className="border-b bg-card/80 backdrop-blur sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="size-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold shadow-sm">
-              <FileSpreadsheet className="size-5" />
-            </div>
-            <div>
-              <div className="font-semibold text-base leading-tight tracking-tight text-foreground flex items-center gap-2">
-                Audit Dispatcher
-                <Badge variant="secondary" className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0">
-                  Path B
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground hidden sm:block">
-                Streamlit to React + Gotenberg Migration
-              </p>
-            </div>
-          </Link>
-        </div>
+    <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200/60 bg-white/95 px-4 backdrop-blur-md shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)] md:px-6">
+      <div className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="flex items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="KGAC Logo"
+              className="h-8 w-auto object-contain"
+              onError={(e) => {
+                // If logo.png fails to load, fallback gracefully to a crisp icon
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent && !parent.querySelector('.fallback-icon')) {
+                  const fallback = document.createElement('div');
+                  fallback.className = 'fallback-icon size-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs';
+                  fallback.innerHTML = '<svg class="size-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>';
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-tight">
+              Audit Report Generator
+            </h1>
+            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+              Audit &amp; Compliance Automation Suite
+            </p>
+          </div>
+        </Link>
+      </div>
 
-        <nav className="flex items-center gap-1 sm:gap-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-secondary text-foreground font-semibold'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-                }`}
-              >
-                <Icon className="size-4" />
-                <span className="hidden md:inline">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <Link to="/settings" className="hidden lg:flex items-center gap-2">
-            <Badge
-              variant={settings.useMockFallback ? 'outline' : 'default'}
-              className="text-xs font-normal gap-1 cursor-pointer py-1"
-            >
-              <span
-                className={`size-2 rounded-full ${
-                  settings.useMockFallback ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
-                }`}
-              />
-              {settings.useMockFallback ? 'Gotenberg: Mock Fallback' : 'Gotenberg: Cloud Run'}
-            </Badge>
-          </Link>
-          <Link
-            to="/settings"
-            className="p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-            title="Settings"
-          >
-            <Sliders className="size-4" />
-          </Link>
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200/80 text-[11px] font-medium text-slate-600">
+          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Engine Active</span>
         </div>
+        <SettingsDialog />
       </div>
     </header>
   );

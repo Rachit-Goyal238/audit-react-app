@@ -15,7 +15,7 @@ import {
 import ExcelJS from 'exceljs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -98,54 +98,55 @@ export function TabGenerateReport() {
         },
         {
           q: 3,
-          status: 'Partially Complied',
-          obs: 'Customer consent form missing signature of guarantor on 2 sample loan accounts.',
-          rem: 'Secondary document requested from branch | Open | 30-Nov-2026',
+          status: 'Complied',
+          obs: 'Receipt books reconciliation matches cash deposits on bank slip.',
+          rem: 'Reconciled 44 receipts | Closed | Verified by manager',
         },
         {
           q: 4,
-          status: 'Non-Complied',
-          obs: 'Collection agency identity cards lacked company hologram stamp.',
-          rem: 'New ID cards to be issued by Vendor Admin | Open | 10-Nov-2026',
+          status: 'Complied',
+          obs: 'Asset register and hardware tags maintained in good condition.',
+          rem: 'Closed | Verified on site',
         },
         {
           q: 5,
           status: 'Complied',
-          obs: 'Receipt book series sequence fully accounted for without gaps.',
-          rem: 'Physical register cross-checked | Closed | Verified',
+          obs: 'Physical security: agency locks and CCTV footage operational.',
+          rem: 'Closed | 30 days footage verified',
         },
       ];
 
-      testObservations.forEach((item) => {
+      for (const item of testObservations) {
         ws.addRow([
           'TC-1049',
-          'AGC-9921',
-          'Apex Financial & Collection Services LLP',
-          'Mumbai',
-          'Pawan Kumar',
+          'AG-9021',
+          'Apex Financial Recovery Services',
+          'Mumbai BKC',
+          'Rahul Sharma',
           '15-Oct-2026',
           item.q,
           item.status,
           item.obs,
           item.rem,
         ]);
-      });
+      }
 
-      const masterBuffer = await wb.xlsx.writeBuffer();
-      const sampleMaster = new File([masterBuffer], 'Base_Data_Sample.xlsx', {
+      const buffer = await wb.xlsx.writeBuffer();
+      const sampleMaster = new File([buffer], 'Master_Audits_2026.xlsx', {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
-      // 2. Create a realistic Sample Audit Report PDF with Page 1 header and Observation pages
+      // 2. Create a clean sample Audit PDF with Cover Info
       const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-      // Page 1: Header details
       const page1 = pdfDoc.addPage([595, 842]);
-      page1.drawText('INTERNAL AUDIT ENGAGEMENT MEMORANDUM', { x: 50, y: 790, size: 14, font: bold });
+      page1.drawText('TATA CAPITAL AUDIT INSPECTION REPORT', { x: 50, y: 800, size: 16, font: bold, color: rgb(0.1, 0.2, 0.6) });
+      page1.drawText('Official Audit Assessment & Compliance Verification', { x: 50, y: 780, size: 10, font, color: rgb(0.4, 0.4, 0.4) });
+
       page1.drawText('AGENCY NAME', { x: 50, y: 740, size: 10, font: bold });
-      page1.drawText('Apex Financial & Collection Services LLP', { x: 50, y: 725, size: 10, font });
+      page1.drawText('Apex Financial Recovery Services', { x: 50, y: 725, size: 10, font });
 
       page1.drawText('OPERATING ADDRESS', { x: 50, y: 690, size: 10, font: bold });
       page1.drawText('Unit 402, Trade Center, BKC, Bandra East, Mumbai - 400051', { x: 50, y: 675, size: 10, font });
@@ -167,7 +168,7 @@ export function TabGenerateReport() {
       const page2 = pdfDoc.addPage([595, 842]);
       page2.drawText('AUDIT FIELD OBSERVATIONS & EVIDENCE', { x: 50, y: 790, size: 14, font: bold });
       page2.drawText('Observation # 1: Dialer Recording Retention Issue', { x: 50, y: 740, size: 12, font: bold, color: rgb(0.8, 0.1, 0.1) });
-      page2.drawText('Screenshot of server disk space showing 98% full on /var/log/asterisk recording mount.', { x: 50, y: 715, size: 10, font });
+      page2.drawText('Screenshot of server disk space showing 98% full on dialer storage.', { x: 50, y: 715, size: 10, font });
       page2.drawRectangle({ x: 50, y: 450, width: 495, height: 240, color: rgb(0.95, 0.95, 0.95), borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 1 });
       page2.drawText('[System Log Artifact / Dialer Storage Screenshot]', { x: 160, y: 560, size: 11, font, color: rgb(0.5, 0.5, 0.5) });
 
@@ -195,7 +196,7 @@ export function TabGenerateReport() {
       return;
     }
     if (!masterFile || !reportPdf) {
-      setErrorMsg('Please upload all files (Master Excel and Audit Report PDF are required).');
+      setErrorMsg('Please upload all required files (Master Excel and Audit Report PDF).');
       return;
     }
 
@@ -219,7 +220,7 @@ export function TabGenerateReport() {
       setReportMetadata(result.metadata);
 
       // Pre-build email state for Tab 2
-      addLog('Analyzing populated checklist and score parameters for email drafting...');
+      addLog('Compiling checklist score summary for email dispatch...');
       const emailExtracted = await extractEmailDataFromExcel(result.downloads.excel);
       const finalScoreData =
         result.scoreData && result.scoreData.rows && result.scoreData.rows.length > 0
@@ -247,7 +248,7 @@ export function TabGenerateReport() {
         reportMetadata: result.metadata,
       });
 
-      addLog('Success! Proceed to the "Dispatch Email" tab.');
+      addLog('Report generated successfully.');
       setIsGenerating(false);
     } catch (err: unknown) {
       setIsGenerating(false);
@@ -257,16 +258,18 @@ export function TabGenerateReport() {
     }
   };
 
+  const currentStatusMsg = generationLogs.length > 0 ? generationLogs[generationLogs.length - 1] : 'Processing...';
+
   return (
     <div className="space-y-6">
-      {/* Demo sample trigger */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border bg-muted/30">
+      {/* Parameters Header Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border border-slate-200/80 bg-white shadow-xs">
         <div>
-          <h2 className="text-base font-semibold text-foreground">
+          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
             Audit Parameters &amp; File Ingestion
           </h2>
-          <p className="text-xs text-muted-foreground">
-            Matches the legacy Streamlit generator: filters Master Excel by Audit ID, injects observations into template cells, and executes Gotenberg PDF compilation.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure client audit parameters and upload checklist inputs.
           </p>
         </div>
         <Button
@@ -274,65 +277,71 @@ export function TabGenerateReport() {
           variant="outline"
           onClick={handleLoadDemoSample}
           disabled={isGenerating}
-          className="gap-2 shrink-0 border-dashed hover:border-primary text-xs cursor-pointer"
+          className="gap-2 shrink-0 border-slate-200 hover:bg-slate-50 text-slate-700 text-xs cursor-pointer rounded-lg font-medium shadow-2xs"
         >
-          <Sparkles className="size-3.5 text-amber-500" />
-          Load Demo Sample (ID: TC-1049)
+          <Sparkles className="size-3.5 text-blue-600" />
+          Load Sample Data (TC-1049)
         </Button>
       </div>
 
       {errorMsg && (
-        <Alert variant="destructive">
-          <AlertCircle className="size-4" />
-          <AlertTitle>Validation Error</AlertTitle>
-          <AlertDescription className="text-xs">{errorMsg}</AlertDescription>
+        <Alert variant="destructive" className="rounded-xl border-red-200 bg-red-50 text-red-900">
+          <AlertCircle className="size-4 text-red-600" />
+          <AlertTitle className="text-xs font-semibold">Validation Error</AlertTitle>
+          <AlertDescription className="text-xs mt-1">{errorMsg}</AlertDescription>
         </Alert>
       )}
 
-      {/* Inputs Form */}
-      <Card>
+      {/* Main Parameters Form */}
+      <Card className="rounded-xl border border-slate-200/80 shadow-xs bg-white">
         <CardContent className="p-6 space-y-6">
           {/* Audit ID */}
-          <div className="space-y-1.5">
-            <Label htmlFor="audit_id" className="text-sm font-semibold">
-              Enter Audit ID <span className="text-destructive">*</span>
+          <div className="space-y-1.5 max-w-md">
+            <Label htmlFor="audit_id" className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Audit ID <span className="text-red-500">*</span>
             </Label>
             <Input
               id="audit_id"
               value={auditId}
               onChange={(e) => setAuditId(e.target.value)}
               placeholder="e.g. TC-1049"
-              className="font-mono text-sm max-w-md"
+              className="font-mono text-xs h-10 border-slate-200 focus:border-blue-600 focus:ring-blue-100 rounded-lg"
             />
-            <p className="text-[11px] text-muted-foreground">
-              Matches rows in the Master Excel where the "Audit ID" column equals this value.
+            <p className="text-[11px] text-slate-400">
+              Corresponds to the unique audit identifier in the Master Excel sheet.
             </p>
           </div>
 
           {/* Master Excel Upload */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-semibold">
-              Upload Master Excel <span className="text-destructive">*</span>
+          <div className="space-y-1.5 max-w-md">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Master Excel File <span className="text-red-500">*</span>
             </Label>
             {masterFile ? (
-              <div className="p-3 rounded-lg border bg-muted/20 flex items-center justify-between max-w-md">
-                <div className="flex items-center gap-2 truncate">
-                  <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
-                  <span className="text-xs font-medium truncate">{masterFile.name}</span>
+              <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                <div className="flex items-center gap-2.5 truncate">
+                  <div className="size-8 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <FileSpreadsheet className="size-4" />
+                  </div>
+                  <div className="truncate">
+                    <p className="text-xs font-medium text-slate-800 truncate">{masterFile.name}</p>
+                    <p className="text-[10px] text-slate-400">{(masterFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMasterFile(null)}
-                  className="text-muted-foreground hover:text-destructive p-1"
+                  className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-slate-200/50 transition-colors"
+                  title="Remove file"
                 >
                   <Trash2 className="size-4" />
                 </button>
               </div>
             ) : (
-              <label className="border-2 border-dashed rounded-lg p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary/60 hover:bg-muted/30 max-w-md transition-colors">
-                <FileSpreadsheet className="size-6 text-emerald-600 mb-1" />
-                <span className="text-xs font-medium text-foreground">Upload Master Excel (.xlsx)</span>
-                <span className="text-[10px] text-muted-foreground">e.g. Base_Data.xlsx or KAF.xlsx</span>
+              <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
+                <FileSpreadsheet className="size-7 text-emerald-600 mb-1.5" />
+                <span className="text-xs font-semibold text-slate-800">Upload Master Excel File</span>
+                <span className="text-[10px] text-slate-400 mt-0.5">Click or drag &amp; drop (.xlsx, .xls)</span>
                 <input
                   type="file"
                   accept=".xlsx, .xls"
@@ -345,9 +354,9 @@ export function TabGenerateReport() {
 
           {/* Client Selector */}
           <div className="space-y-1.5 max-w-md">
-            <Label className="text-sm font-semibold">Select Client</Label>
+            <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Select Client</Label>
             <Select value={client} onValueChange={(val) => { if (val) setClient(val); }}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 border-slate-200 text-xs">
                 <SelectValue placeholder="Select client" />
               </SelectTrigger>
               <SelectContent>
@@ -357,20 +366,20 @@ export function TabGenerateReport() {
             </Select>
           </div>
 
-          {/* YesBank external redirect notice if selected (1:1 with app.py line 133) */}
+          {/* YesBank external redirect notice if selected */}
           {client === 'YesBank' && (
-            <Alert className="border-blue-500 bg-blue-500/10 max-w-md">
+            <Alert className="border-blue-200 bg-blue-50/70 max-w-md rounded-xl">
               <ExternalLink className="size-4 text-blue-600" />
               <AlertTitle className="text-xs font-semibold text-blue-900">
                 YesBank Audit Portal
               </AlertTitle>
-              <AlertDescription className="text-xs text-blue-800 space-y-2">
-                <p>YesBank reports use the dedicated YesBank workflow engine.</p>
+              <AlertDescription className="text-xs text-blue-800 space-y-2 mt-1">
+                <p>YesBank audits utilize the dedicated YesBank workflow portal.</p>
                 <a
                   href="https://audit-report-generator-yesbank.streamlit.app/"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 text-xs shadow-xs"
                 >
                   Open YesBank Report Generator <ExternalLink className="size-3" />
                 </a>
@@ -382,9 +391,9 @@ export function TabGenerateReport() {
             <>
               {/* Template Selector */}
               <div className="space-y-1.5 max-w-md">
-                <Label className="text-sm font-semibold">Select Template</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Template</Label>
                 <Select value={templateType} onValueChange={(val) => { if (val) setTemplateType(val); }}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 border-slate-200 text-xs">
                     <SelectValue placeholder="Select template" />
                   </SelectTrigger>
                   <SelectContent>
@@ -395,37 +404,38 @@ export function TabGenerateReport() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Preloaded from official 2026-27 TATA Capital agency templates.
-                </p>
               </div>
 
               {/* Upload Audit Report PDF */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">
-                  Upload Audit Report PDF <span className="text-destructive">*</span>
+              <div className="space-y-1.5 max-w-md">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Audit Report PDF <span className="text-red-500">*</span>
                 </Label>
                 {reportPdf ? (
-                  <div className="p-3 rounded-lg border bg-muted/20 flex items-center justify-between max-w-md">
-                    <div className="flex items-center gap-2 truncate">
-                      <CheckCircle2 className="size-4 text-purple-600 shrink-0" />
-                      <span className="text-xs font-medium truncate">{reportPdf.name}</span>
+                  <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="size-8 rounded bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                        <FileText className="size-4" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-medium text-slate-800 truncate">{reportPdf.name}</p>
+                        <p className="text-[10px] text-slate-400">{(reportPdf.size / 1024).toFixed(1)} KB</p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setReportPdf(null)}
-                      className="text-muted-foreground hover:text-destructive p-1"
+                      className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-slate-200/50 transition-colors"
+                      title="Remove file"
                     >
                       <Trash2 className="size-4" />
                     </button>
                   </div>
                 ) : (
-                  <label className="border-2 border-dashed rounded-lg p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary/60 hover:bg-muted/30 max-w-md transition-colors">
-                    <FileText className="size-6 text-purple-600 mb-1" />
-                    <span className="text-xs font-medium text-foreground">Upload Audit Report PDF (.pdf)</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Header details read from Page 1; Evidence sliced from Observation pages
-                    </span>
+                  <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
+                    <FileText className="size-7 text-red-600 mb-1.5" />
+                    <span className="text-xs font-semibold text-slate-800">Upload Audit Report PDF</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Report containing inspection observations &amp; evidence</span>
                     <input
                       type="file"
                       accept=".pdf"
@@ -437,31 +447,35 @@ export function TabGenerateReport() {
               </div>
 
               {/* Upload Annexure PDF */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">
-                  Upload Annexure PDF <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
+              <div className="space-y-1.5 max-w-md">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Annexure PDF <span className="text-slate-400 font-normal lowercase">(optional)</span>
                 </Label>
                 {annexurePdf ? (
-                  <div className="p-3 rounded-lg border bg-muted/20 flex items-center justify-between max-w-md">
-                    <div className="flex items-center gap-2 truncate">
-                      <CheckCircle2 className="size-4 text-blue-600 shrink-0" />
-                      <span className="text-xs font-medium truncate">{annexurePdf.name}</span>
+                  <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="size-8 rounded bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                        <FileUp className="size-4" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-medium text-slate-800 truncate">{annexurePdf.name}</p>
+                        <p className="text-[10px] text-slate-400">{(annexurePdf.size / 1024).toFixed(1)} KB</p>
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setAnnexurePdf(null)}
-                      className="text-muted-foreground hover:text-destructive p-1"
+                      className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-slate-200/50 transition-colors"
+                      title="Remove file"
                     >
                       <Trash2 className="size-4" />
                     </button>
                   </div>
                 ) : (
-                  <label className="border-2 border-dashed rounded-lg p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary/60 hover:bg-muted/30 max-w-md transition-colors">
-                    <FileUp className="size-6 text-blue-600 mb-1" />
-                    <span className="text-xs font-medium text-foreground">Upload Annexure PDF (.pdf)</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Appended client-side via pdf-lib into final merged report
-                    </span>
+                  <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
+                    <FileUp className="size-7 text-blue-600 mb-1.5" />
+                    <span className="text-xs font-semibold text-slate-800">Upload Annexure PDF</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Appended to final compiled report</span>
                     <input
                       type="file"
                       accept=".pdf"
@@ -479,11 +493,11 @@ export function TabGenerateReport() {
                   size="lg"
                   onClick={handleGenerateReport}
                   disabled={isGenerating}
-                  className="gap-2 cursor-pointer font-medium w-full sm:w-auto"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-xs transition-colors cursor-pointer w-full sm:w-auto h-11"
                 >
                   {isGenerating ? (
                     <>
-                      <Loader2 className="size-4 animate-spin" />
+                      <Loader2 className="size-4 animate-spin mr-2" />
                       Generating Report...
                     </>
                   ) : (
@@ -496,76 +510,91 @@ export function TabGenerateReport() {
         </CardContent>
       </Card>
 
-      {/* Real-time execution log */}
-      {generationLogs.length > 0 && (
-        <Card className="bg-black/95 text-emerald-400 font-mono text-xs p-4 rounded-xl space-y-1 max-h-48 overflow-y-auto">
-          {generationLogs.map((log, idx) => (
-            <div key={idx} className="leading-relaxed">
-              {log}
+      {/* Clean Stepper / Progress Indicator while Generating */}
+      {isGenerating && (
+        <Card className="rounded-xl border border-blue-200 bg-blue-50/50 p-6 shadow-xs animate-in fade-in-50">
+          <div className="flex items-center gap-4">
+            <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+              <Loader2 className="size-5 text-blue-600 animate-spin" />
             </div>
-          ))}
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-semibold text-blue-950">Compiling Audit Report...</h4>
+              <p className="text-xs text-blue-700 truncate mt-0.5">{currentStatusMsg}</p>
+              <div className="w-full bg-blue-200 h-1.5 rounded-full mt-3 overflow-hidden">
+                <div className="bg-blue-600 h-full rounded-full animate-pulse w-3/4" />
+              </div>
+            </div>
+          </div>
         </Card>
       )}
 
-      {/* Downloads Section (1:1 with Streamlit downloads block lines 223-246) */}
+      {/* Downloads / Delivery Section */}
       {downloads && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2 text-emerald-700">
-              <CheckCircle2 className="size-5" />
-              <CardTitle className="text-base text-emerald-800">
-                Report generated successfully. Proceed to the 'Dispatch Email' tab.
-              </CardTitle>
-            </div>
-            <CardDescription className="text-xs">
-              All deliverables have been compiled, verified, and packaged into browser memory.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Complete Package ZIP */}
-            <Button
-              type="button"
-              onClick={() => downloadBlob(downloads.zip, 'Audit_Report_Package.zip')}
-              className="w-full sm:w-auto gap-2 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-            >
-              <Download className="size-4" />
-              Download Complete Package (ZIP)
-            </Button>
-
-            {/* Subheader: Individual Downloads */}
-            <div className="pt-3 border-t space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">Individual Downloads</h3>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => downloadBlob(downloads.excel, downloads.excel_name)}
-                  className="gap-2 text-xs cursor-pointer"
-                >
-                  <FileSpreadsheet className="size-4 text-emerald-600" />
-                  Download Excel Report ({downloads.excel_name})
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => downloadBlob(downloads.final, downloads.final_name)}
-                  className="gap-2 text-xs cursor-pointer"
-                >
-                  <FileText className="size-4 text-red-600" />
-                  Download Final Report ({downloads.final_name})
-                </Button>
+        <Card className="rounded-xl border border-emerald-200 bg-emerald-50/60 shadow-xs">
+          <CardContent className="p-6 space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="size-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Report Package Generated Successfully
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Excel scores, individual slice PDFs, and final merged report ready for dispatch.
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
               <Button
                 type="button"
                 onClick={() => setActiveTab('email')}
-                className="gap-2 cursor-pointer font-medium"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-semibold gap-1.5 shadow-xs shrink-0 cursor-pointer hidden sm:flex items-center"
               >
-                Proceed to Dispatch Email Tab
-                <ArrowRight className="size-4" />
+                Proceed to Dispatch Email
+                <ArrowRight className="size-3.5" />
+              </Button>
+            </div>
+
+            <div className="pt-2 border-t border-emerald-200/60 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                onClick={() => downloadBlob(downloads.zip, 'Audit_Report_Package.zip')}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-xs font-medium gap-2 shadow-xs cursor-pointer"
+              >
+                <Download className="size-3.5" />
+                Download Complete Package (ZIP)
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => downloadBlob(downloads.excel, downloads.excel_name)}
+                className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg px-3 py-2 text-xs font-medium gap-2 cursor-pointer shadow-2xs"
+              >
+                <FileSpreadsheet className="size-3.5 text-emerald-600" />
+                Excel Report
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => downloadBlob(downloads.final, downloads.final_name)}
+                className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg px-3 py-2 text-xs font-medium gap-2 cursor-pointer shadow-2xs"
+              >
+                <FileText className="size-3.5 text-red-600" />
+                Final Merged Report (PDF)
+              </Button>
+            </div>
+
+            <div className="pt-2 flex justify-end sm:hidden">
+              <Button
+                type="button"
+                onClick={() => setActiveTab('email')}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-xs font-semibold gap-1.5 shadow-xs"
+              >
+                Proceed to Dispatch Email
+                <ArrowRight className="size-3.5" />
               </Button>
             </div>
           </CardContent>

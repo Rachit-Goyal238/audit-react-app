@@ -1,19 +1,13 @@
 export function Footer() {
   return (
-    <footer className="border-t bg-card/50 py-6 mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-        <div>
-          <span className="font-semibold text-foreground">Audit Report Generator &amp; Dispatcher</span> — Standalone React 19 + Gotenberg Architecture
-        </div>
-        <div className="flex items-center gap-4">
-          <span>ExcelJS / SheetJS</span>
-          <span>•</span>
-          <span>pdf-lib</span>
-          <span>•</span>
-          <span>Gotenberg Cloud Run</span>
-          <span>•</span>
-          <span>Google GIS</span>
-        </div>
+    <footer className="border-t border-slate-200/60 bg-white/70 py-4 mt-auto">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <p className="flex items-center gap-1.5 font-medium">
+          <span>&copy; {new Date().getFullYear()} KGAC. Audit &amp; Compliance Automation Suite.</span>
+        </p>
+        <p className="text-[11px] text-slate-400">
+          Internal Enterprise Tool
+        </p>
       </div>
     </footer>
   );

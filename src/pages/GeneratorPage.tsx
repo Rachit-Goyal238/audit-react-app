@@ -1,66 +1,70 @@
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TabGenerateReport } from '@/components/tabs/TabGenerateReport';
 import { TabDispatchEmail } from '@/components/tabs/TabDispatchEmail';
 import { useAudit } from '@/context/AuditContext';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, Mail } from 'lucide-react';
+import { FileSpreadsheet, Mail, CheckCircle2 } from 'lucide-react';
 
 export function GeneratorPage() {
   const { activeTab, setActiveTab, downloads } = useAudit();
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Page Title (1:1 with app.py line 77) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            Audit Report Generator &amp; Dispatcher
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Audit Report Generator
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            1:1 Migration of the TATA Capital &amp; YesBank Streamlit automation platform with Gotenberg API.
+          <p className="text-xs text-slate-500 mt-1">
+            Automate Excel checklist compilation, observation extraction, and PDF report generation.
           </p>
         </div>
         {downloads && (
-          <Badge className="bg-emerald-600 text-white font-mono text-xs py-1 px-2.5 self-start sm:self-auto">
-            Report Ready for Dispatch
+          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs py-1 px-3 self-start sm:self-auto flex items-center gap-1.5 shadow-xs">
+            <CheckCircle2 className="size-3.5 text-emerald-600" />
+            Report Package Ready for Dispatch
           </Badge>
         )}
       </div>
 
-      {/* 2-Tab Navigation (1:1 with app.py line 122: st.tabs(["1. Generate Report", "2. Dispatch Email"])) */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(val) => setActiveTab(val as 'generate' | 'email')}
-        className="w-full space-y-6"
-      >
-        <TabsList className="grid w-full sm:w-[420px] grid-cols-2 h-11 p-1 bg-muted">
-          <TabsTrigger
-            value="generate"
-            className="flex items-center gap-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs cursor-pointer"
+      {/* 2-Tab Navigation - team-allocation-calendar segmented control design */}
+      <div className="flex justify-start">
+        <div className="inline-flex p-1 bg-slate-200/60 rounded-xl border border-slate-200/70 shadow-inner gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('generate')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'generate'
+                ? 'bg-white text-blue-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
           >
             <FileSpreadsheet className="size-4" />
             1. Generate Report
-          </TabsTrigger>
-          <TabsTrigger
-            value="email"
-            className="flex items-center gap-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs cursor-pointer"
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('email')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'email'
+                ? 'bg-white text-blue-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
           >
             <Mail className="size-4" />
             2. Dispatch Email
             {downloads && (
-              <span className="size-2 rounded-full bg-emerald-500 animate-pulse ml-1" />
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
             )}
-          </TabsTrigger>
-        </TabsList>
+          </button>
+        </div>
+      </div>
 
-        <TabsContent value="generate" className="focus-visible:outline-none">
-          <TabGenerateReport />
-        </TabsContent>
-
-        <TabsContent value="email" className="focus-visible:outline-none">
-          <TabDispatchEmail />
-        </TabsContent>
-      </Tabs>
+      {/* Tab Panels */}
+      <div>
+        {activeTab === 'generate' && <TabGenerateReport />}
+        {activeTab === 'email' && <TabDispatchEmail />}
+      </div>
     </div>
   );
 }

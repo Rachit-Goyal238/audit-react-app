@@ -14,9 +14,11 @@ import {
   Download,
   Copy,
   Check,
+  ArrowRight,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -29,6 +31,7 @@ import {
   requestGoogleAccessToken,
   createGmailDraft,
   createEmlBlob,
+  getGmailWebComposeUrl,
   type AttachmentItem,
 } from '@/services/gmailService';
 import { downloadBlob } from '@/services/pdfService';
@@ -40,6 +43,7 @@ export function TabDispatchEmail() {
     emailState,
     setEmailState,
     settings,
+    setActiveTab,
   } = useAudit();
 
   const [isDrafting, setIsDrafting] = useState(false);
@@ -47,15 +51,29 @@ export function TabDispatchEmail() {
   const [draftError, setDraftError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
   if (!downloads || !reportMetadata) {
     return (
-      <div className="p-12 text-center border rounded-xl bg-card">
-        <Mail className="size-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-        <h3 className="text-base font-semibold text-foreground">Awaiting Report Generation</h3>
-        <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-          Please generate an audit report in the first tab to configure and preview the email.
+      <Card className="rounded-xl border border-slate-200/80 bg-white p-12 text-center shadow-xs">
+        <div className="size-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+          <Mail className="size-6" />
+        </div>
+        <h3 className="text-base font-semibold text-slate-900">Awaiting Audit Report Generation</h3>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          Please generate an audit report in Step 1 first to compile the scores, observations, and attachments.
         </p>
-      </div>
+        <div className="mt-5">
+          <Button
+            type="button"
+            onClick={() => setActiveTab('generate')}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 gap-1.5 shadow-xs"
+          >
+            Go to Generate Report
+            <ArrowRight className="size-3.5" />
+          </Button>
+        </div>
+      </Card>
     );
   }
 
@@ -123,18 +141,14 @@ export function TabDispatchEmail() {
   };
 
   const handleCreateDraft = async () => {
-    if (!settings.googleClientId) {
-      setDraftError(
-        'Google Client ID is not configured in Settings. Please set your OAuth 2.0 Client ID in the top right Settings modal, or use the "Download .EML / Outlook" option below.'
-      );
-      return;
-    }
+    const clientId = settings.googleClientId || '329014618082-oj3mi2aqhponkovjack8rkma2r284kkm.apps.googleusercontent.com';
 
     try {
       setIsDrafting(true);
       setDraftError(null);
+      setDraftResult(null);
 
-      const token = await requestGoogleAccessToken(settings.googleClientId);
+      const token = await requestGoogleAccessToken(clientId);
       const attachments = getAttachmentsList();
 
       const res = await createGmailDraft(
@@ -148,11 +162,17 @@ export function TabDispatchEmail() {
 
       setDraftResult(res);
       setIsDrafting(false);
-      window.open('https://mail.google.com/mail/u/0/#drafts', '_blank');
+      window.open(res.viewUrl, '_blank');
     } catch (err: unknown) {
       setIsDrafting(false);
-      setDraftError(err instanceof Error ? err.message : String(err));
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      setDraftError(rawMsg);
     }
+  };
+
+  const handleOpenGmailWeb = () => {
+    const composeUrl = getGmailWebComposeUrl(emailState.to, emailState.cc, emailState.subject, '');
+    window.open(composeUrl, '_blank');
   };
 
   const handleDownloadEml = async () => {
@@ -181,22 +201,32 @@ export function TabDispatchEmail() {
     }
   };
 
+  const isOriginError = draftError && (
+    draftError.toLowerCase().includes('origin') ||
+    draftError.toLowerCase().includes('redirect_uri') ||
+    draftError.toLowerCase().includes('unauthorized') ||
+    draftError.toLowerCase().includes('popup_closed')
+  );
+
   return (
     <div className="space-y-6">
-      {/* Email Configuration (1:1 with upload.py lines 6-20) */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Email Configuration</CardTitle>
-          <CardDescription className="text-xs">
-            Configure client parameters and format type for draft generation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Parameters & Configuration Card */}
+      <Card className="rounded-xl border border-slate-200/80 shadow-xs bg-white">
+        <CardContent className="p-6 space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+              Email Configuration
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select email format and configure recipient auditor addresses.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Client</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Client</Label>
               <Select value="TATA Capital" disabled>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 border-slate-200 text-xs bg-slate-50">
                   <SelectValue placeholder="TATA Capital" />
                 </SelectTrigger>
                 <SelectContent>
@@ -206,14 +236,14 @@ export function TabDispatchEmail() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Email Type</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Email Type</Label>
               <Select
                 value={emailState.emailType}
                 onValueChange={(val) => {
                   if (val) handleEmailTypeChange(val as 'Report Email' | 'Closure Email');
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 border-slate-200 text-xs">
                   <SelectValue placeholder="Select Email Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -223,59 +253,58 @@ export function TabDispatchEmail() {
               </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Email Details (1:1 with upload.py lines 50-60) */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Email Details</CardTitle>
-          <CardDescription className="text-xs">
-            Review subject line and configure auditor recipient addresses.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Subject Line (Auto-Formatted)</Label>
-            <Input
-              value={emailState.subject}
-              onChange={(e) => setEmailState((prev) => ({ ...prev, subject: e.target.value }))}
-              className="text-xs font-medium"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Subject & Recipients */}
+          <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">To (Comma separated)</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject Line</Label>
               <Input
-                placeholder="auditee@tatacapital.com, manager@tatacapital.com"
-                value={emailState.to}
-                onChange={(e) => setEmailState((prev) => ({ ...prev, to: e.target.value }))}
-                className="text-xs"
+                value={emailState.subject}
+                onChange={(e) => setEmailState((prev) => ({ ...prev, subject: e.target.value }))}
+                className="text-xs font-medium h-10 border-slate-200 focus:border-blue-600 rounded-lg"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">CC (Comma separated)</Label>
-              <Input
-                placeholder="compliance@tatacapital.com, audit@kgac.in"
-                value={emailState.cc}
-                onChange={(e) => setEmailState((prev) => ({ ...prev, cc: e.target.value }))}
-                className="text-xs"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  To <span className="text-slate-400 font-normal lowercase">(comma separated)</span>
+                </Label>
+                <Input
+                  placeholder="auditee@tatacapital.com, manager@tatacapital.com"
+                  value={emailState.to}
+                  onChange={(e) => setEmailState((prev) => ({ ...prev, to: e.target.value }))}
+                  className="text-xs h-10 border-slate-200 focus:border-blue-600 rounded-lg"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  CC <span className="text-slate-400 font-normal lowercase">(comma separated)</span>
+                </Label>
+                <Input
+                  placeholder="compliance@tatacapital.com, audit@kgac.in"
+                  value={emailState.cc}
+                  onChange={(e) => setEmailState((prev) => ({ ...prev, cc: e.target.value }))}
+                  className="text-xs h-10 border-slate-200 focus:border-blue-600 rounded-lg"
+                />
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Attachment Options (1:1 with upload.py lines 62-110) */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Attachments Configuration</CardTitle>
-          <CardDescription className="text-xs">
-            Select standard generated packages or attach additional annexures.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Attachments Card */}
+      <Card className="rounded-xl border border-slate-200/80 shadow-xs bg-white">
+        <CardContent className="p-6 space-y-4">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+              Attachments Configuration
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select which generated packages to include in the dispatch.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* ZIP Package Option */}
             <div
@@ -285,8 +314,10 @@ export function TabDispatchEmail() {
                   attachZip: !prev.attachZip,
                 }))
               }
-              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer select-none transition-colors ${
-                emailState.attachZip ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+              className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none transition-all ${
+                emailState.attachZip
+                  ? 'border-blue-500 bg-blue-50/30 shadow-2xs'
+                  : 'border-slate-200 hover:bg-slate-50'
               }`}
             >
               <div onClick={(e) => e.stopPropagation()}>
@@ -298,18 +329,18 @@ export function TabDispatchEmail() {
                       attachZip: !!checked,
                     }))
                   }
-                  className="mt-1"
+                  className="mt-0.5"
                 />
               </div>
               <div className="space-y-1 flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <Archive className="size-4 text-primary" />
-                  <span className="text-xs font-semibold">Audit_Report_Package.zip</span>
+                  <Archive className="size-4 text-blue-600" />
+                  <span className="text-xs font-semibold text-slate-900">Audit_Report_Package.zip</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Complete bundle: Populated Excel + Individual PDFs + Final Merged Report
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Complete bundle: Populated Excel + Observation PDFs + Merged Report
                 </p>
-                <Badge variant="outline" className="text-[10px] font-mono mt-1">
+                <Badge variant="outline" className="text-[10px] font-mono border-slate-200 text-slate-600 mt-0.5">
                   {(downloads.zip.size / (1024 * 1024)).toFixed(2)} MB
                 </Badge>
               </div>
@@ -323,8 +354,10 @@ export function TabDispatchEmail() {
                   attachPdf: !prev.attachPdf,
                 }))
               }
-              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer select-none transition-colors ${
-                emailState.attachPdf ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+              className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none transition-all ${
+                emailState.attachPdf
+                  ? 'border-blue-500 bg-blue-50/30 shadow-2xs'
+                  : 'border-slate-200 hover:bg-slate-50'
               }`}
             >
               <div onClick={(e) => e.stopPropagation()}>
@@ -336,18 +369,18 @@ export function TabDispatchEmail() {
                       attachPdf: !!checked,
                     }))
                   }
-                  className="mt-1"
+                  className="mt-0.5"
                 />
               </div>
               <div className="space-y-1 flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <FileText className="size-4 text-emerald-600" />
-                  <span className="text-xs font-semibold truncate">{downloads.final_name}</span>
+                  <FileText className="size-4 text-red-600" />
+                  <span className="text-xs font-semibold text-slate-900 truncate">{downloads.final_name}</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Final merged PDF with checklist report, evidence slices, and annexures
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Final merged PDF with checklist report and annexures
                 </p>
-                <Badge variant="outline" className="text-[10px] font-mono mt-1">
+                <Badge variant="outline" className="text-[10px] font-mono border-slate-200 text-slate-600 mt-0.5">
                   {(downloads.final.size / (1024 * 1024)).toFixed(2)} MB
                 </Badge>
               </div>
@@ -355,11 +388,11 @@ export function TabDispatchEmail() {
           </div>
 
           {/* Additional Attachments */}
-          <div className="pt-2 border-t">
+          <div className="pt-3 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs font-semibold flex items-center gap-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <Paperclip className="size-3.5" />
-                Additional Attachments
+                Additional Files
               </Label>
               <label className="cursor-pointer">
                 <Input
@@ -368,8 +401,8 @@ export function TabDispatchEmail() {
                   className="hidden"
                   onChange={handleFileUpload}
                 />
-                <span className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
-                  <FilePlus className="size-3.5" /> Add files
+                <span className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
+                  <FilePlus className="size-3.5" /> Add Files
                 </span>
               </label>
             </div>
@@ -379,27 +412,27 @@ export function TabDispatchEmail() {
                 {emailState.additionalAttachments.map((file, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between px-3 py-1.5 rounded-md bg-muted/40 border text-xs"
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs"
                   >
-                    <span className="truncate max-w-sm">{file.name}</span>
+                    <span className="truncate max-w-sm font-medium text-slate-700">{file.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[11px] text-slate-400">
                         {(file.size / 1024).toFixed(1)} KB
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
+                      <button
+                        type="button"
                         onClick={() => handleRemoveAdditional(idx)}
-                        className="text-muted-foreground hover:text-destructive cursor-pointer"
+                        className="text-slate-400 hover:text-red-600 p-1 transition-colors"
+                        title="Remove"
                       >
-                        <Trash2 className="size-3" />
-                      </Button>
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-muted-foreground italic">
+              <p className="text-[11px] text-slate-400 italic">
                 No additional annexures attached.
               </p>
             )}
@@ -407,52 +440,57 @@ export function TabDispatchEmail() {
         </CardContent>
       </Card>
 
-      {/* Live Email Preview (1:1 with Streamlit HTML preview) */}
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-base">Live Email Preview</CardTitle>
-            <CardDescription className="text-xs">
-              Rendered with branded TATA tables, color-coded score parameters, and auditor signature.
-            </CardDescription>
+      {/* Live Email Preview */}
+      <Card className="rounded-xl border border-slate-200/80 shadow-xs bg-white">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Email Preview
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Formatted HTML email body with client score parameter breakdown.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopyHtml}
+                className="gap-1.5 text-xs text-slate-700 border-slate-200 hover:bg-slate-50 rounded-lg cursor-pointer shadow-2xs"
+              >
+                {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                {copied ? 'HTML Copied' : 'Copy HTML'}
+              </Button>
+            </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleCopyHtml}
-            className="gap-1.5 text-xs cursor-pointer"
-          >
-            {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-            {copied ? 'Copied!' : 'Copy HTML'}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg p-6 bg-white overflow-x-auto shadow-inner max-h-[500px] overflow-y-auto">
+
+          <div className="border border-slate-200 rounded-xl p-5 bg-white overflow-x-auto shadow-inner max-h-[500px] overflow-y-auto">
             <div
               dangerouslySetInnerHTML={{ __html: emailState.html }}
-              className="prose prose-sm max-w-none text-black"
+              className="prose prose-sm max-w-none text-slate-800"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Dispatch Actions (1:1 with draft.py lines 6-52) */}
-      <Card>
+      {/* Dispatch Action Buttons */}
+      <Card className="rounded-xl border border-slate-200/80 shadow-xs bg-white">
         <CardContent className="p-6 space-y-4">
           {draftResult && (
-            <Alert className="border-emerald-500 bg-emerald-500/10">
+            <Alert className="rounded-xl border-emerald-200 bg-emerald-50 text-emerald-900">
               <CheckCircle2 className="size-4 text-emerald-600" />
-              <AlertTitle className="text-xs font-semibold text-emerald-800">
-                ✅ Gmail Draft Created Successfully!
+              <AlertTitle className="text-xs font-semibold text-emerald-950">
+                Gmail Draft Created Successfully
               </AlertTitle>
-              <AlertDescription className="text-xs text-emerald-700">
-                The draft has been saved directly to your Gmail account with the formatted HTML body and attachments.
+              <AlertDescription className="text-xs text-emerald-800 mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span>The draft has been saved to your Gmail account with the formatted HTML body and attachments.</span>
                 <a
                   href={draftResult.viewUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-semibold underline ml-1 hover:text-emerald-900"
+                  className="inline-flex items-center gap-1 font-semibold underline text-emerald-900 hover:text-emerald-950 shrink-0"
                 >
                   Open Gmail Drafts <ExternalLink className="size-3" />
                 </a>
@@ -461,47 +499,77 @@ export function TabDispatchEmail() {
           )}
 
           {draftError && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
+            <Alert variant="destructive" className="rounded-xl border-red-200 bg-red-50 text-red-900">
+              <AlertCircle className="size-4 text-red-600" />
               <AlertTitle className="text-xs font-semibold">Gmail Authorization Notice</AlertTitle>
-              <AlertDescription className="text-xs">{draftError}</AlertDescription>
+              <AlertDescription className="text-xs text-red-800 mt-1 space-y-2">
+                <p>{draftError}</p>
+                {isOriginError && (
+                  <div className="p-2.5 rounded bg-white/70 border border-red-200 text-[11px] text-slate-700 space-y-1">
+                    <p className="font-semibold text-slate-900 flex items-center gap-1">
+                      <Info className="size-3.5 text-blue-600" />
+                      Domain Authorization:
+                    </p>
+                    <p>
+                      To enable 1-click Gmail drafting from this URL, add <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">{currentOrigin}</code> to <strong>Authorized JavaScript origins</strong> in Google Cloud Console.
+                    </p>
+                    <p className="font-medium text-slate-900">
+                      In the meantime, you can use the <strong>Open in Gmail Web</strong> or <strong>Download .EML</strong> options below!
+                    </p>
+                  </div>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Primary Action: Direct Gmail Draft API */}
             <Button
               type="button"
               size="lg"
               onClick={handleCreateDraft}
               disabled={isDrafting}
-              className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white font-medium cursor-pointer h-12 text-sm shadow-sm"
+              className="w-full gap-2 bg-red-600 hover:bg-red-700 text-white font-medium cursor-pointer h-11 text-xs rounded-lg shadow-xs"
             >
               {isDrafting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Creating Gmail Draft...
+                  Creating Draft...
                 </>
               ) : (
                 <>
                   <Send className="size-4" />
-                  📨 Generate Gmail Draft
+                  Create Gmail Draft
                 </>
               )}
             </Button>
 
+            {/* Alternative Action 1: Gmail Web Compose link */}
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handleOpenGmailWeb}
+              className="w-full gap-2 bg-white border-slate-200 hover:bg-slate-50 text-slate-800 font-medium cursor-pointer h-11 text-xs rounded-lg shadow-2xs"
+            >
+              <ExternalLink className="size-4 text-blue-600" />
+              Open in Gmail Web
+            </Button>
+
+            {/* Alternative Action 2: Download .EML for Outlook / Desktop */}
             <Button
               type="button"
               variant="outline"
               size="lg"
               onClick={handleDownloadEml}
-              className="w-full gap-2 border-primary/30 hover:border-primary text-foreground font-medium cursor-pointer h-12 text-sm shadow-sm"
+              className="w-full gap-2 bg-white border-slate-200 hover:bg-slate-50 text-slate-800 font-medium cursor-pointer h-11 text-xs rounded-lg shadow-2xs"
             >
-              <Download className="size-4 text-primary" />
-              📥 Download .EML (Outlook / Mail)
+              <Download className="size-4 text-slate-600" />
+              Download .EML (Outlook)
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground text-center">
-            Tip: You can create a direct Gmail draft via OAuth in Google Cloud, or download the standard .EML file to open directly in Microsoft Outlook or Apple Mail.
+          <p className="text-[11px] text-slate-400 text-center">
+            Create drafts directly in Gmail with OAuth, open Gmail Web composer, or download standard .EML for Microsoft Outlook.
           </p>
         </CardContent>
       </Card>
