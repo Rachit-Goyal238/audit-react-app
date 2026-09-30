@@ -3,7 +3,15 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import JSZip from 'jszip';
-import type { TataPdfHeaderData, ReportMetadata, GeneratedDownloads, AppSettings } from '../types/audit';
+import type {
+  TataPdfHeaderData,
+  ReportMetadata,
+  GeneratedDownloads,
+  AppSettings,
+  ScoreData,
+  ScoreRow,
+  ScoreSummary,
+} from '../types/audit';
 import { convertExcelToPdfViaGotenberg } from './gotenbergService';
 import { compressPdfIfPossible } from './pdfService';
 
@@ -191,7 +199,7 @@ export async function generateTataReport(
   annexurePdfFile: File | null,
   settings: AppSettings,
   onProgress?: (msg: string) => void
-): Promise<{ downloads: GeneratedDownloads; metadata: ReportMetadata }> {
+): Promise<{ downloads: GeneratedDownloads; metadata: ReportMetadata; scoreData?: ScoreData }> {
   onProgress?.('Parsing Master Excel workbook...');
   const masterBuffer = await masterFile.arrayBuffer();
   const masterWb = new ExcelJS.Workbook();
@@ -375,9 +383,22 @@ export async function generateTataReport(
     if (isNaN(qNum) || !questionRowMap[qNum]) continue;
 
     const targetRow = questionRowMap[qNum];
-    const statusDetail = String(auditRow['Status Detail'] || '').trim();
-    const keyObservation = String(auditRow['Key Observation'] || '').trim();
-    const parsed = parseClosingComment(auditRow['Remarks']);
+    const statusDetail = String(
+      auditRow['Status Detail'] ||
+      auditRow['status detail'] ||
+      auditRow['Status'] ||
+      auditRow['status'] ||
+      auditRow['Compliance status\n (Yes / No)'] ||
+      auditRow['Compliance status (Yes / No)'] ||
+      ''
+    ).trim();
+    const keyObservation = String(
+      auditRow['Key Observation'] ||
+      auditRow['key observation'] ||
+      ''
+    ).trim();
+    const remarksVal = auditRow['Remarks'] || auditRow['remarks'] || '';
+    const parsed = parseClosingComment(remarksVal);
 
     ws.getCell(`F${targetRow}`).value = statusDetail;
     ws.getCell(`G${targetRow}`).value = keyObservation;
@@ -436,7 +457,7 @@ export async function generateTataReport(
 
     const eCell = ws.getCell(`E${r}`);
     const fVal = String(ws.getCell(`F${r}`).value || '').trim().toLowerCase();
-    const isYes = fVal === 'yes';
+    const isYes = ['yes', 'complied', 'y', 'true'].includes(fVal);
 
     const weight = getChecklistRowWeight(eCell, ws);
     const actual = isYes ? weight : 0;
@@ -454,6 +475,15 @@ export async function generateTataReport(
   }
 
   // Evaluate Score Parameters Sheet
+  const scoreRows: ScoreRow[] = [];
+  let scoreSummary: ScoreSummary = {
+    total_key_points: '0',
+    total_weightage: '0',
+    total_actual: '0',
+    percentage: '0%',
+    final_rating: 'E',
+  };
+
   const scoreWs = templateWb.getWorksheet('Score Parameters') || templateWb.worksheets.find(w => w.name.toLowerCase().includes('score'));
   if (scoreWs) {
     let totalKey = 0;
@@ -468,6 +498,12 @@ export async function generateTataReport(
 
       if (srVal.toUpperCase() === 'TOTAL' || partVal.toUpperCase() === 'TOTAL') {
         const totalPct = totalWeight > 0 ? (totalActual / totalWeight) : 0;
+        const totalPctDisplay = totalWeight > 0 ? `${Math.round((totalActual / totalWeight) * 100)}%` : '0%';
+
+        scoreSummary.total_key_points = String(totalKey);
+        scoreSummary.total_weightage = String(totalWeight);
+        scoreSummary.total_actual = String(totalActual);
+        scoreSummary.percentage = totalPctDisplay;
 
         const cCell = scoreWs.getCell(`C${r}`);
         const dCell = scoreWs.getCell(`D${r}`);
@@ -493,6 +529,8 @@ export async function generateTataReport(
         else if (totalPctNum >= 60) grade = 'C';
         else if (totalPctNum >= 50) grade = 'D';
         else grade = 'E';
+
+        scoreSummary.final_rating = grade;
 
         const fCell = scoreWs.getCell(`F${r}`);
         if (fCell.value && typeof fCell.value === 'object') {
@@ -520,6 +558,7 @@ export async function generateTataReport(
         const act = stats ? stats.actual : 0;
         const kp = stats ? stats.keyPoints : 0;
         const pctVal = wt > 0 ? (act / wt) : '-';
+        const pctDisplay = wt > 0 ? `${Math.round((act / wt) * 100)}%` : '-';
 
         totalKey += kp;
         totalWeight += wt;
@@ -536,6 +575,15 @@ export async function generateTataReport(
 
         if (fCell.value && typeof fCell.value === 'object') (fCell.value as any).result = pctVal;
         else fCell.value = pctVal;
+
+        scoreRows.push({
+          'S. No.': srVal,
+          Particulars: partVal,
+          'Key Points': String(kp),
+          Weightage: String(wt),
+          Actual: String(act),
+          Percentage: pctDisplay,
+        });
       }
     }
 
@@ -624,6 +672,11 @@ export async function generateTataReport(
     final_name: paths.final,
   };
 
+  const scoreData: ScoreData = {
+    rows: scoreRows,
+    summary: scoreSummary,
+  };
+
   onProgress?.('Report generation and packaging completed successfully!');
-  return { downloads, metadata };
+  return { downloads, metadata, scoreData };
 }

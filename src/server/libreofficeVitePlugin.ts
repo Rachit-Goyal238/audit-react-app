@@ -45,7 +45,7 @@ export function libreofficeLocalPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         // Health check endpoint
-        if (req.url === '/health' && req.method === 'GET') {
+        if ((req.url === '/health' || req.url === '/api/health') && req.method === 'GET') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(
             JSON.stringify({

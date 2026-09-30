@@ -1,6 +1,7 @@
 export const config = {
   api: {
     bodyParser: false,
+    responseLimit: '50mb',
   },
 };
 
@@ -17,24 +18,46 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const targetUrl = (process.env.VITE_GOTENBERG_URL || 'http://localhost:3000').replace(/\/+$/, '');
+  const clientUrl = req.headers['x-gotenberg-url'];
+  const targetUrl = (
+    clientUrl && typeof clientUrl === 'string' && !clientUrl.includes('localhost')
+      ? clientUrl
+      : (process.env.VITE_GOTENBERG_URL || 'http://localhost:3000')
+  ).replace(/\/+$/, '');
 
   try {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const bodyBuffer = Buffer.concat(chunks);
+
     const upstreamResp = await fetch(`${targetUrl}/forms/libreoffice/convert`, {
       method: 'POST',
       headers: {
         'content-type': req.headers['content-type'] || '',
       },
-      body: req,
-      // @ts-ignore
-      duplex: 'half',
+      body: bodyBuffer,
     });
 
-    res.status(upstreamResp.status);
-    const buffer = Buffer.from(await upstreamResp.arrayBuffer());
+    if (!upstreamResp.ok) {
+      const errText = await upstreamResp.text().catch(() => '');
+      return res.status(upstreamResp.status).json({
+        error: `Gotenberg error (HTTP ${upstreamResp.status})`,
+        details: errText,
+        targetUrl,
+      });
+    }
+
+    const pdfBuffer = Buffer.from(await upstreamResp.arrayBuffer());
     res.setHeader('Content-Type', 'application/pdf');
-    return res.send(buffer);
+    res.setHeader('Content-Disposition', 'attachment; filename="report.pdf"');
+    return res.status(200).send(pdfBuffer);
   } catch (err) {
-    return res.status(502).json({ error: 'Gotenberg proxy error', details: err?.message || String(err) });
+    return res.status(502).json({
+      error: 'Gotenberg proxy error',
+      details: err?.message || String(err),
+      targetUrl,
+    });
   }
 }

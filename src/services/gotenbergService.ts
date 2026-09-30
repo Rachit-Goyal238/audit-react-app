@@ -9,31 +9,61 @@ export interface GotenbergHealthResult {
 
 export async function checkGotenbergHealth(url: string): Promise<GotenbergHealthResult> {
   const cleanUrl = url.trim().replace(/\/+$/, '');
-  const candidateUrls: string[] = [];
+  const localOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
-  if (cleanUrl) candidateUrls.push(cleanUrl);
-  if (typeof window !== 'undefined' && !candidateUrls.includes(window.location.origin)) {
-    candidateUrls.push(window.location.origin);
+  const candidateEndpoints: { endpoint: string; useProxy: boolean; label: string }[] = [];
+
+  // When deployed or running locally, prioritize the same-domain API proxy to bypass browser CORS
+  if (localOrigin) {
+    candidateEndpoints.push({
+      endpoint: `${localOrigin}/api/health`,
+      useProxy: true,
+      label: 'Cloud Proxy (/api/health)',
+    });
+    candidateEndpoints.push({
+      endpoint: `${localOrigin}/health`,
+      useProxy: false,
+      label: 'Local Dev Bridge (/health)',
+    });
   }
 
-  for (const endpoint of candidateUrls) {
+  if (cleanUrl) {
+    candidateEndpoints.push({
+      endpoint: `${cleanUrl}/health`,
+      useProxy: false,
+      label: `Direct Gotenberg (${cleanUrl})`,
+    });
+  }
+
+  for (const { endpoint, useProxy } of candidateEndpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      // Render free tier can take up to 45 seconds to wake up from idle
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-      const response = await fetch(`${endpoint}/health`, {
+      const headers: Record<string, string> = {};
+      if (useProxy && cleanUrl) {
+        headers['x-gotenberg-url'] = cleanUrl;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'GET',
+        headers,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        const engine = data.engine || 'Gotenberg LibreOffice';
-        return {
-          isUp: true,
-          statusText: `Conversion service active (${engine}) at ${endpoint}`,
-        };
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json().catch(() => ({}));
+          const engine = data.engine || 'Gotenberg LibreOffice';
+          return {
+            isUp: true,
+            statusText: `Conversion service active (${engine})`,
+            details: `Endpoint: ${cleanUrl || endpoint}`,
+          };
+        }
       }
     } catch {
       // Continue to next candidate
@@ -42,8 +72,8 @@ export async function checkGotenbergHealth(url: string): Promise<GotenbergHealth
 
   return {
     isUp: false,
-    statusText: 'No conversion endpoint reachable (Gotenberg or local LibreOffice bridge).',
-    details: 'Verify Docker/Cloud Run Gotenberg URL or run Vite in dev mode with local LibreOffice installed.',
+    statusText: 'No conversion endpoint reachable.',
+    details: 'If using Render free tier, it may take ~45s to wake up on first request. Verify your Gotenberg URL in Settings.',
   };
 }
 
@@ -56,65 +86,81 @@ export async function convertExcelToPdfViaGotenberg(
   const cleanUrl = settings.gotenbergUrl.trim().replace(/\/+$/, '');
   const localOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
-  const candidates: { url: string; label: string }[] = [];
-  if (cleanUrl) {
-    candidates.push({ url: cleanUrl, label: `Configured endpoint (${cleanUrl})` });
-  }
-  if (localOrigin && localOrigin !== cleanUrl) {
-    candidates.push({ url: localOrigin, label: 'Local LibreOffice Bridge' });
+  const candidates: { url: string; label: string; useProxy: boolean }[] = [];
+
+  // 1. Same-origin Cloud Proxy (Bypasses all browser CORS restrictions)
+  if (localOrigin) {
+    candidates.push({
+      url: `${localOrigin}/api/convert`,
+      label: 'Cloud Serverless Proxy (/api/convert)',
+      useProxy: true,
+    });
+    candidates.push({
+      url: `${localOrigin}/forms/libreoffice/convert`,
+      label: 'Local LibreOffice Bridge',
+      useProxy: false,
+    });
   }
 
-  for (const { url, label } of candidates) {
+  // 2. Direct Gotenberg endpoint
+  if (cleanUrl) {
+    candidates.push({
+      url: `${cleanUrl}/forms/libreoffice/convert`,
+      label: `Direct Gotenberg (${cleanUrl})`,
+      useProxy: false,
+    });
+  }
+
+  for (const { url, label, useProxy } of candidates) {
     try {
-      onProgress?.(`Connecting to ${label}...`);
+      onProgress?.(`Connecting to ${label}... (waking up instance if idle)`);
       const formData = new FormData();
       formData.append('files', excelBlob, fileName);
       formData.append('landscape', 'true');
 
       const headers: Record<string, string> = {};
-      if (settings.gotenbergApiKey && url === cleanUrl) {
+      if (useProxy && cleanUrl) {
+        headers['x-gotenberg-url'] = cleanUrl;
+      }
+      if (settings.gotenbergApiKey && !useProxy) {
         headers['Authorization'] = `Bearer ${settings.gotenbergApiKey}`;
       }
 
-      let response: Response | null = null;
-      try {
-        response = await fetch(`${url}/forms/libreoffice/convert`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-      } catch {
-        // Retry with /api/convert if same origin proxy
-        if (url === localOrigin) {
-          response = await fetch(`${url}/api/convert`, {
-            method: 'POST',
-            headers,
-            body: formData,
-          }).catch(() => null);
-        }
-      }
+      const controller = new AbortController();
+      // Render free tier cold starts take up to 60s
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
 
       if (response && response.ok) {
-        onProgress?.(`PDF successfully compiled via ${label}!`);
-        const pdfArrayBuffer = await response.arrayBuffer();
-        return {
-          pdfBlob: new Blob([pdfArrayBuffer], { type: 'application/pdf' }),
-          usedFallback: false,
-        };
+        const cType = response.headers.get('content-type') || '';
+        if (cType.includes('pdf') || cType.includes('octet-stream')) {
+          onProgress?.(`PDF successfully compiled via ${label}!`);
+          const pdfArrayBuffer = await response.arrayBuffer();
+          return {
+            pdfBlob: new Blob([pdfArrayBuffer], { type: 'application/pdf' }),
+            usedFallback: false,
+          };
+        }
       }
     } catch {
-      onProgress?.(`${label} unavailable, checking alternatives...`);
+      onProgress?.(`${label} unavailable, trying alternative connection...`);
     }
   }
 
   if (!settings.useMockFallback) {
     throw new Error(
-      'Excel-to-PDF conversion service unavailable. Ensure Gotenberg is running or LibreOffice is installed locally.'
+      'Excel-to-PDF conversion service unavailable. Ensure Gotenberg is running or Render has finished booting.'
     );
   }
 
   // Fallback client-side PDF generation using pdf-lib
-  onProgress?.('Both Gotenberg and local bridge unavailable. Generating client-side preview PDF...');
+  onProgress?.('Cloud conversion unavailable. Generating client-side preview PDF...');
   const fallbackBlob = await generateFallbackAuditPdf(fileName);
   return {
     pdfBlob: fallbackBlob,

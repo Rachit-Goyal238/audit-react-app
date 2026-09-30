@@ -221,11 +221,16 @@ export function TabGenerateReport() {
       // Pre-build email state for Tab 2
       addLog('Analyzing populated checklist and score parameters for email drafting...');
       const emailExtracted = await extractEmailDataFromExcel(result.downloads.excel);
+      const finalScoreData =
+        result.scoreData && result.scoreData.rows && result.scoreData.rows.length > 0
+          ? result.scoreData
+          : emailExtracted.scoreData;
+
       const emailBuilt = buildEmailHtml(
         'Report Email',
         result.metadata,
         emailExtracted.observations,
-        emailExtracted.scoreData
+        finalScoreData
       );
 
       setEmailState({
@@ -238,7 +243,7 @@ export function TabGenerateReport() {
         additionalAttachments: [],
         html: emailBuilt.html,
         observations: emailExtracted.observations,
-        scoreData: emailExtracted.scoreData,
+        scoreData: finalScoreData,
         reportMetadata: result.metadata,
       });
 
