@@ -444,6 +444,14 @@ export async function generateTataReport(
     return 0;
   }
 
+  function setCellResult(cell: ExcelJS.Cell, result: any) {
+    if (cell.value && typeof cell.value === 'object') {
+      cell.value = { ...(cell.value as any), result } as any;
+    } else {
+      cell.value = result;
+    }
+  }
+
   const catScores: Record<string, { keyPoints: number; weightage: number; actual: number }> = {};
 
   for (let r = 8; r <= ws.rowCount; r++) {
@@ -462,9 +470,7 @@ export async function generateTataReport(
     const weight = getChecklistRowWeight(eCell, ws);
     const actual = isYes ? weight : 0;
 
-    if (eCell.value && typeof eCell.value === 'object') {
-      (eCell.value as any).result = actual;
-    }
+    setCellResult(eCell, actual);
 
     if (!catScores[cat]) {
       catScores[cat] = { keyPoints: 0, weightage: 0, actual: 0 };
@@ -510,17 +516,10 @@ export async function generateTataReport(
         const eCell = scoreWs.getCell(`E${r}`);
         const fCell = scoreWs.getCell(`F${r}`);
 
-        if (cCell.value && typeof cCell.value === 'object') (cCell.value as any).result = totalKey;
-        else cCell.value = totalKey;
-
-        if (dCell.value && typeof dCell.value === 'object') (dCell.value as any).result = totalWeight;
-        else dCell.value = totalWeight;
-
-        if (eCell.value && typeof eCell.value === 'object') (eCell.value as any).result = totalActual;
-        else eCell.value = totalActual;
-
-        if (fCell.value && typeof fCell.value === 'object') (fCell.value as any).result = totalPct;
-        else fCell.value = totalPct;
+        setCellResult(cCell, totalKey);
+        setCellResult(dCell, totalWeight);
+        setCellResult(eCell, totalActual);
+        setCellResult(fCell, totalPct);
       } else if (srVal.toUpperCase() === 'FINAL RATING' || partVal.toUpperCase() === 'FINAL RATING') {
         const totalPctNum = totalWeight > 0 ? Math.round((totalActual / totalWeight) * 100) : 0;
         let grade = 'E';
@@ -533,11 +532,7 @@ export async function generateTataReport(
         scoreSummary.final_rating = grade;
 
         const fCell = scoreWs.getCell(`F${r}`);
-        if (fCell.value && typeof fCell.value === 'object') {
-          (fCell.value as any).result = grade;
-        } else {
-          fCell.value = grade;
-        }
+        setCellResult(fCell, grade);
       } else if (srVal !== '') {
         const stats = catScores[partVal];
         const cCell = scoreWs.getCell(`C${r}`);
@@ -564,17 +559,10 @@ export async function generateTataReport(
         totalWeight += wt;
         totalActual += act;
 
-        if (cCell.value && typeof cCell.value === 'object') (cCell.value as any).result = kp;
-        else cCell.value = kp;
-
-        if (dCell.value && typeof dCell.value === 'object') (dCell.value as any).result = wt;
-        else dCell.value = wt;
-
-        if (eCell.value && typeof eCell.value === 'object') (eCell.value as any).result = act;
-        else eCell.value = act;
-
-        if (fCell.value && typeof fCell.value === 'object') (fCell.value as any).result = pctVal;
-        else fCell.value = pctVal;
+        setCellResult(cCell, kp);
+        setCellResult(dCell, wt);
+        setCellResult(eCell, act);
+        setCellResult(fCell, pctVal);
 
         scoreRows.push({
           'S. No.': srVal,
