@@ -143,6 +143,64 @@ export function TabDispatchEmail() {
   const handleCreateDraft = async () => {
     const clientId = settings.googleClientId || '329014618082-oj3mi2aqhponkovjack8rkma2r284kkm.apps.googleusercontent.com';
 
+    // Synchronously open blank window on click to guarantee popup blocker doesn't block it
+    const draftWindow = window.open('about:blank', '_blank');
+    if (draftWindow) {
+      try {
+        draftWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Opening Gmail Draft...</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  height: 100vh;
+                  margin: 0;
+                  background-color: #f8fafc;
+                  color: #0f172a;
+                }
+                .container {
+                  text-align: center;
+                  padding: 2.5rem;
+                  background: white;
+                  border-radius: 1rem;
+                  box-shadow: 0 4px 20px -2px rgba(0,0,0,0.06);
+                  border: 1px solid #e2e8f0;
+                  max-width: 380px;
+                }
+                .spinner {
+                  width: 40px;
+                  height: 40px;
+                  border: 3.5px solid #e2e8f0;
+                  border-top-color: #2563eb;
+                  border-radius: 50%;
+                  animation: spin 0.8s linear infinite;
+                  margin: 0 auto 1.25rem;
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
+                h3 { margin: 0 0 0.5rem; font-size: 1.15rem; font-weight: 700; color: #0f172a; }
+                p { margin: 0; color: #64748b; font-size: 0.85rem; line-height: 1.5; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="spinner"></div>
+                <h3>Creating Gmail Draft...</h3>
+                <p>Generating formatted score tables and packaging attachments. Opening Gmail automatically...</p>
+              </div>
+            </body>
+          </html>
+        `);
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       setIsDrafting(true);
       setDraftError(null);
@@ -162,8 +220,19 @@ export function TabDispatchEmail() {
 
       setDraftResult(res);
       setIsDrafting(false);
-      window.open(res.viewUrl, '_blank');
+
+      // Automatically redirect the tab directly to Gmail Drafts
+      const draftsUrl = res.viewUrl || 'https://mail.google.com/mail/u/0/#drafts';
+      if (draftWindow && !draftWindow.closed) {
+        draftWindow.location.replace(draftsUrl);
+        draftWindow.focus();
+      } else {
+        window.open(draftsUrl, '_blank');
+      }
     } catch (err: unknown) {
+      if (draftWindow && !draftWindow.closed) {
+        draftWindow.close();
+      }
       setIsDrafting(false);
       const rawMsg = err instanceof Error ? err.message : String(err);
       setDraftError(rawMsg);
