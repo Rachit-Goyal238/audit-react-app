@@ -41,7 +41,7 @@ export function SettingsDialog() {
   };
 
   const handleResetDefaults = () => {
-    const defaultClientId = '329014618082-oj3mi2aqhponkovjack8rkma2r284kkm.apps.googleusercontent.com';
+    const defaultClientId = '123563855658-75uqhm7c28orvndc7me6ralsfus3np9g.apps.googleusercontent.com';
     const defaultGotenberg = import.meta.env.VITE_GOTENBERG_URL || '';
     setGotenbergUrl(defaultGotenberg);
     setGotenbergApiKey('');

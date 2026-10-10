@@ -131,7 +131,7 @@ export function TabDispatchEmail() {
   };
 
   const handleCreateDraft = async () => {
-    const clientId = settings.googleClientId || '329014618082-oj3mi2aqhponkovjack8rkma2r284kkm.apps.googleusercontent.com';
+    const clientId = settings.googleClientId || '123563855658-75uqhm7c28orvndc7me6ralsfus3np9g.apps.googleusercontent.com';
 
     // Synchronously open blank window on click to guarantee popup blocker doesn't block it
     const draftWindow = window.open('about:blank', '_blank');

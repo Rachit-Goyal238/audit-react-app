@@ -61,7 +61,7 @@ const defaultEmailState: EmailState = {
 const defaultSettings: AppSettings = {
   gotenbergUrl: import.meta.env.VITE_GOTENBERG_URL || '',
   gotenbergApiKey: import.meta.env.VITE_GOTENBERG_API_KEY || '',
-  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '329014618082-oj3mi2aqhponkovjack8rkma2r284kkm.apps.googleusercontent.com',
+  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '123563855658-75uqhm7c28orvndc7me6ralsfus3np9g.apps.googleusercontent.com',
   useMockFallback: false,
 };
 
@@ -91,7 +91,7 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
         if (isWeb && parsed.gotenbergUrl && (parsed.gotenbergUrl.includes('localhost') || parsed.gotenbergUrl.includes('127.0.0.1'))) {
           parsed.gotenbergUrl = import.meta.env.VITE_GOTENBERG_URL || '';
         }
-        if (!parsed.googleClientId) {
+        if (!parsed.googleClientId || parsed.googleClientId === '329014618082-oj3mi2aqhponkovjack8rkma2r284kkm.apps.googleusercontent.com') {
           parsed.googleClientId = defaultSettings.googleClientId;
         }
         return { ...defaultSettings, ...parsed };
