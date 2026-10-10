@@ -10,7 +10,6 @@ import {
   ExternalLink,
   Sparkles,
   ArrowRight,
-  Trash2,
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -24,6 +23,7 @@ import { useAudit } from '@/context/AuditContext';
 import { generateTataReport } from '@/services/tataEngine';
 import { extractEmailDataFromExcel, buildEmailHtml } from '@/services/emailBuilder';
 import { downloadBlob } from '@/services/pdfService';
+import { FileDropzone } from '@/components/ui/file-dropzone';
 
 export function TabGenerateReport() {
   const {
@@ -317,39 +317,17 @@ export function TabGenerateReport() {
             <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Master Excel File <span className="text-red-500">*</span>
             </Label>
-            {masterFile ? (
-              <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between">
-                <div className="flex items-center gap-2.5 truncate">
-                  <div className="size-8 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                    <FileSpreadsheet className="size-4" />
-                  </div>
-                  <div className="truncate">
-                    <p className="text-xs font-medium text-slate-800 truncate">{masterFile.name}</p>
-                    <p className="text-[10px] text-slate-400">{(masterFile.size / 1024).toFixed(1)} KB</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMasterFile(null)}
-                  className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-slate-200/50 transition-colors"
-                  title="Remove file"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            ) : (
-              <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
-                <FileSpreadsheet className="size-7 text-emerald-600 mb-1.5" />
-                <span className="text-xs font-semibold text-slate-800">Upload Master Excel File</span>
-                <span className="text-[10px] text-slate-400 mt-0.5">Click or drag &amp; drop (.xlsx, .xls)</span>
-                <input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  className="hidden"
-                  onChange={(e) => setMasterFile(e.target.files?.[0] || null)}
-                />
-              </label>
-            )}
+            <FileDropzone
+              id="master-excel-dropzone"
+              accept=".xlsx, .xls"
+              file={masterFile}
+              onFileSelect={setMasterFile}
+              title="Upload Master Excel File"
+              subtitle="Drag & drop file here or click to browse (.xlsx, .xls)"
+              icon={<FileSpreadsheet className="size-5" />}
+              iconBgColor="bg-emerald-100"
+              iconColor="text-emerald-700"
+            />
           </div>
 
           {/* Client Selector */}
@@ -411,39 +389,17 @@ export function TabGenerateReport() {
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Audit Report PDF <span className="text-red-500">*</span>
                 </Label>
-                {reportPdf ? (
-                  <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5 truncate">
-                      <div className="size-8 rounded bg-red-100 text-red-700 flex items-center justify-center shrink-0">
-                        <FileText className="size-4" />
-                      </div>
-                      <div className="truncate">
-                        <p className="text-xs font-medium text-slate-800 truncate">{reportPdf.name}</p>
-                        <p className="text-[10px] text-slate-400">{(reportPdf.size / 1024).toFixed(1)} KB</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setReportPdf(null)}
-                      className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-slate-200/50 transition-colors"
-                      title="Remove file"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
-                    <FileText className="size-7 text-red-600 mb-1.5" />
-                    <span className="text-xs font-semibold text-slate-800">Upload Audit Report PDF</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">Report containing inspection observations &amp; evidence</span>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      className="hidden"
-                      onChange={(e) => setReportPdf(e.target.files?.[0] || null)}
-                    />
-                  </label>
-                )}
+                <FileDropzone
+                  id="report-pdf-dropzone"
+                  accept=".pdf"
+                  file={reportPdf}
+                  onFileSelect={setReportPdf}
+                  title="Upload Audit Report PDF"
+                  subtitle="Drag & drop file here or click to browse (.pdf)"
+                  icon={<FileText className="size-5" />}
+                  iconBgColor="bg-red-100"
+                  iconColor="text-red-700"
+                />
               </div>
 
               {/* Upload Annexure PDF */}
@@ -451,39 +407,17 @@ export function TabGenerateReport() {
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Annexure PDF <span className="text-slate-400 font-normal lowercase">(optional)</span>
                 </Label>
-                {annexurePdf ? (
-                  <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5 truncate">
-                      <div className="size-8 rounded bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                        <FileUp className="size-4" />
-                      </div>
-                      <div className="truncate">
-                        <p className="text-xs font-medium text-slate-800 truncate">{annexurePdf.name}</p>
-                        <p className="text-[10px] text-slate-400">{(annexurePdf.size / 1024).toFixed(1)} KB</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAnnexurePdf(null)}
-                      className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-slate-200/50 transition-colors"
-                      title="Remove file"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all">
-                    <FileUp className="size-7 text-blue-600 mb-1.5" />
-                    <span className="text-xs font-semibold text-slate-800">Upload Annexure PDF</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">Appended to final compiled report</span>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      className="hidden"
-                      onChange={(e) => setAnnexurePdf(e.target.files?.[0] || null)}
-                    />
-                  </label>
-                )}
+                <FileDropzone
+                  id="annexure-pdf-dropzone"
+                  accept=".pdf"
+                  file={annexurePdf}
+                  onFileSelect={setAnnexurePdf}
+                  title="Upload Annexure PDF"
+                  subtitle="Drag & drop file here or click to browse (.pdf)"
+                  icon={<FileUp className="size-5" />}
+                  iconBgColor="bg-blue-100"
+                  iconColor="text-blue-700"
+                />
               </div>
 
               {/* Generate Report Button */}

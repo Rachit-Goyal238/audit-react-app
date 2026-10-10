@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Mail,
   Send,
@@ -9,7 +9,6 @@ import {
   FileText,
   Archive,
   Loader2,
-  FilePlus,
   Trash2,
   Download,
   Copy,
@@ -35,6 +34,7 @@ import {
   type AttachmentItem,
 } from '@/services/gmailService';
 import { downloadBlob } from '@/services/pdfService';
+import { FileDropzone } from '@/components/ui/file-dropzone';
 
 export function TabDispatchEmail() {
   const {
@@ -93,16 +93,6 @@ export function TabDispatchEmail() {
       subject: rebuilt.subject,
       html: rebuilt.html,
     }));
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files);
-      setEmailState((prev) => ({
-        ...prev,
-        additionalAttachments: [...prev.additionalAttachments, ...newFiles],
-      }));
-    }
   };
 
   const handleRemoveAdditional = (idx: number) => {
@@ -457,24 +447,36 @@ export function TabDispatchEmail() {
           </div>
 
           {/* Additional Attachments */}
-          <div className="pt-3 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Paperclip className="size-3.5" />
-                Additional Files
-              </Label>
-              <label className="cursor-pointer">
-                <Input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-                <span className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
-                  <FilePlus className="size-3.5" /> Add Files
-                </span>
-              </label>
-            </div>
+          <div className="pt-3 border-t border-slate-100 space-y-3">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Paperclip className="size-3.5" />
+              Additional Files
+            </Label>
+
+            <FileDropzone
+              id="additional-files-dropzone"
+              multiple
+              onFilesSelect={(newFiles) => {
+                setEmailState((prev) => ({
+                  ...prev,
+                  additionalAttachments: [...prev.additionalAttachments, ...newFiles],
+                }));
+              }}
+              onFileSelect={(file) => {
+                if (file) {
+                  setEmailState((prev) => ({
+                    ...prev,
+                    additionalAttachments: [...prev.additionalAttachments, file],
+                  }));
+                }
+              }}
+              title="Upload Additional Files"
+              subtitle="Click or drag & drop extra attachments here (PDF, Excel, Images)"
+              icon={<Paperclip className="size-5" />}
+              iconBgColor="bg-slate-100"
+              iconColor="text-slate-700"
+              className="p-5"
+            />
 
             {emailState.additionalAttachments.length > 0 ? (
               <div className="space-y-1.5">
