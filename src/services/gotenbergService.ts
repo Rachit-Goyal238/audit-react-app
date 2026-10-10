@@ -116,7 +116,7 @@ export async function convertExcelToPdfViaGotenberg(
       onProgress?.(`Connecting to ${label}... (waking up instance if idle)`);
       const formData = new FormData();
       formData.append('files', excelBlob, fileName);
-      formData.append('landscape', 'true');
+      formData.append('landscape', 'false');
 
       const headers: Record<string, string> = {};
       if (useProxy && cleanUrl) {
@@ -177,7 +177,7 @@ async function generateFallbackAuditPdf(fileName: string): Promise<Blob> {
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  const page = doc.addPage([842, 595]); // A4 Landscape
+  const page = doc.addPage([595, 842]); // A4 Portrait
   const { width, height } = page.getSize();
 
   // Header banner

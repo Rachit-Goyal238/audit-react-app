@@ -326,7 +326,7 @@ export async function generateTataReport(
     // Fallback template workbook creation in memory so it NEVER crashes
     const fallbackWb = new ExcelJS.Workbook();
     const wsFallback = fallbackWb.addWorksheet('Checklist');
-    wsFallback.pageSetup = { fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'landscape', paperSize: 9 };
+    wsFallback.pageSetup = { fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait', paperSize: 9 };
     wsFallback.addRow(['INTERNAL AUDIT REPORT & MANAGEMENT ACTION PLAN']);
     wsFallback.addRow(['', '', '', '', '', '', '']);
     wsFallback.addRow(['', '', '', '', '', '', '']);
@@ -617,7 +617,7 @@ export async function generateTataReport(
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
-      orientation: 'landscape',
+      orientation: 'portrait',
       paperSize: 9,
     };
   }
@@ -630,7 +630,7 @@ export async function generateTataReport(
     fitToPage: true,
     fitToWidth: 1,
     fitToHeight: 0,
-    orientation: 'landscape',
+    orientation: 'portrait',
     paperSize: 9, // A4
   };
 
