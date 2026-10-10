@@ -376,6 +376,20 @@ export async function generateTataReport(
     }
   }
 
+  // Pre-clean all checklist rows (A to J) so nothing from template is bold
+  for (let r = 8; r <= ws.rowCount; r++) {
+    const aVal = ws.getCell(`A${r}`).value;
+    if (aVal !== null && aVal !== undefined && !isNaN(parseInt(String(aVal), 10))) {
+      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].forEach((col) => {
+        const cell = ws.getCell(`${col}${r}`);
+        cell.style = {
+          ...cell.style,
+          font: { ...(cell.font || { name: 'Calibri', size: 9 }), bold: false },
+        };
+      });
+    }
+  }
+
   for (const auditRow of auditRows) {
     const qVal = auditRow['Question No.'];
     if (qVal === undefined || qVal === null) continue;
@@ -400,19 +414,43 @@ export async function generateTataReport(
     const remarksVal = auditRow['Remarks'] || auditRow['remarks'] || '';
     const parsed = parseClosingComment(remarksVal);
 
+    const pendingStatus = String(
+      parsed.status ||
+      auditRow['Pending Status'] ||
+      auditRow['pending status'] ||
+      auditRow['Pending Status (Open/ Closed)'] ||
+      auditRow['Pending Status\n(Open/ Closed)'] ||
+      auditRow['Closure Status'] ||
+      auditRow['closure status'] ||
+      ''
+    ).trim();
+
     ws.getCell(`F${targetRow}`).value = statusDetail;
     ws.getCell(`G${targetRow}`).value = keyObservation;
     ws.getCell(`H${targetRow}`).value = parsed.remarks;
-    ws.getCell(`I${targetRow}`).value = parsed.status;
+    ws.getCell(`I${targetRow}`).value = pendingStatus || parsed.status;
     ws.getCell(`J${targetRow}`).value = parsed.timeline;
 
-    // Bold cells if pending status is open or closed
-    if (['open', 'closed'].includes(parsed.status.toLowerCase())) {
-      ['F', 'G', 'H', 'I', 'J'].forEach((col) => {
-        const cell = ws.getCell(`${col}${targetRow}`);
-        cell.font = { ...cell.font, bold: true };
-      });
-    }
+    // Only remarks having closure status either Closed or Open to be bold (Column F to J), nothing else needs to be bold
+    const isClosureBold = ['open', 'closed'].includes(pendingStatus.toLowerCase());
+
+    // Columns F to J: bold IF AND ONLY IF closure status is Open or Closed
+    ['F', 'G', 'H', 'I', 'J'].forEach((col) => {
+      const cell = ws.getCell(`${col}${targetRow}`);
+      cell.style = {
+        ...cell.style,
+        font: { ...(cell.font || { name: 'Calibri', size: 9 }), bold: isClosureBold },
+      };
+    });
+
+    // Columns A to E: NEVER bold
+    ['A', 'B', 'C', 'D', 'E'].forEach((col) => {
+      const cell = ws.getCell(`${col}${targetRow}`);
+      cell.style = {
+        ...cell.style,
+        font: { ...(cell.font || { name: 'Calibri', size: 9 }), bold: false },
+      };
+    });
   }
 
   // 4b. Evaluate Checklist Column E & Score Parameters sheet
