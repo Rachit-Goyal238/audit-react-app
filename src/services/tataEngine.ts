@@ -90,6 +90,93 @@ export async function extractPdfHeader(pdfFile: File): Promise<TataPdfHeaderData
   }
 }
 
+export function resolveTataTemplateType(
+  pdfAgencyType?: string,
+  userSelectedType?: string,
+  questionCount?: number
+): 'Collection' | 'Repossesion' | 'Collection And Repossesion' | 'Stockyard' {
+  // 1. Check PDF agency_type first (most direct source of truth)
+  if (pdfAgencyType && pdfAgencyType.trim().length > 0) {
+    const clean = pdfAgencyType.toLowerCase();
+    if (clean.includes('stockyard')) {
+      return 'Stockyard';
+    }
+    if (clean.includes('collection') && (clean.includes('repo') || clean.includes('repossession'))) {
+      return 'Collection And Repossesion';
+    }
+    if (clean.includes('repo') || clean.includes('repossession')) {
+      return 'Repossesion';
+    }
+    if (clean.includes('collection')) {
+      return 'Collection';
+    }
+  }
+
+  // 2. Check question count from master excel if available
+  if (questionCount) {
+    if (questionCount >= 58 || questionCount === 61) return 'Collection And Repossesion';
+    if (questionCount === 35) return 'Stockyard';
+    if (questionCount === 32) return 'Repossesion';
+    if (questionCount === 51 || (questionCount >= 45 && questionCount <= 55)) return 'Collection';
+  }
+
+  // 3. Fall back to user selected type if valid
+  if (userSelectedType) {
+    const clean = userSelectedType.toLowerCase();
+    if (clean.includes('stockyard')) return 'Stockyard';
+    if (clean.includes('collection') && (clean.includes('repo') || clean.includes('repossession'))) return 'Collection And Repossesion';
+    if (clean.includes('repo') || clean.includes('repossession')) return 'Repossesion';
+    if (clean.includes('collection')) return 'Collection';
+  }
+
+  return 'Collection';
+}
+
+export async function detectTemplateFromMasterExcel(
+  masterFile: File,
+  auditId?: string
+): Promise<{ detected: 'Collection' | 'Repossesion' | 'Collection And Repossesion' | 'Stockyard'; questionCount: number } | null> {
+  try {
+    const arrayBuffer = await masterFile.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(arrayBuffer);
+    const sheet = wb.worksheets[0];
+    if (!sheet) return null;
+
+    const headers: string[] = [];
+    sheet.getRow(1).eachCell((cell, col) => {
+      headers[col - 1] = String(cell.value || '').trim();
+    });
+
+    const auditIdCol = headers.findIndex((h) => h.toLowerCase() === 'audit id');
+    let matchingRows = 0;
+
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      if (auditId && auditId.trim().length > 0 && auditIdCol !== -1) {
+        const cellVal = String(row.getCell(auditIdCol + 1).value || '').trim();
+        if (cellVal.toLowerCase() === auditId.trim().toLowerCase()) {
+          matchingRows++;
+        }
+      } else {
+        const qCell = row.getCell(1).value;
+        if (qCell !== null && qCell !== undefined) {
+          matchingRows++;
+        }
+      }
+    });
+
+    if (matchingRows > 0) {
+      const detected = resolveTataTemplateType(undefined, undefined, matchingRows);
+      return { detected, questionCount: matchingRows };
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error detecting template from master excel:', err);
+    return null;
+  }
+}
+
 export async function extractEvidencePages(pdfFile: File): Promise<Blob> {
   const arrayBuffer = await pdfFile.arrayBuffer();
   const sourceDoc = await PDFDocument.load(arrayBuffer);
@@ -283,7 +370,12 @@ export async function generateTataReport(
   // 3. Extract Header Info from Page 1 of Audit Report PDF
   onProgress?.('Extracting agency & manager header details from Audit Report PDF...');
   const pdfHeaderData = await extractPdfHeader(reportPdfFile);
-  const report_type = pdfHeaderData.agency_type || templateType || 'Collection';
+  const resolvedTemplate = resolveTataTemplateType(
+    pdfHeaderData.agency_type,
+    templateType,
+    auditRows.length
+  );
+  const report_type = pdfHeaderData.agency_type || resolvedTemplate || 'Collection';
   const product = pdfHeaderData.product || 'Unknown_Product';
 
   if (!location || location === 'Location Not Found') {
@@ -303,7 +395,7 @@ export async function generateTataReport(
   const paths = createOutputPaths(agency_name, agency_code, location, report_type, product);
 
   // 4. Load Template Excel from public/templates
-  onProgress?.(`Loading official template for '${client} - ${templateType}'...`);
+  onProgress?.(`Loading official template for '${client} - ${resolvedTemplate}'...`);
   const tataTemplateMap: Record<string, string> = {
     'Collection': '/templates/TATA Capital/TATA_Collection_Agency_Template_2026-27.xlsx',
     'Repossesion': '/templates/TATA Capital/TATA_Repo_Agency_Template_2026-27.xlsx',
@@ -311,7 +403,7 @@ export async function generateTataReport(
     'Stockyard': '/templates/TATA Capital/TATA_Stockyard_Agency_Template_2026-27.xlsx',
   };
 
-  const templatePath = tataTemplateMap[templateType] || tataTemplateMap['Collection'];
+  const templatePath = tataTemplateMap[resolvedTemplate] || tataTemplateMap['Collection'];
   let templateBuffer: ArrayBuffer;
 
   try {

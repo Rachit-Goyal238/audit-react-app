@@ -20,7 +20,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAudit } from '@/context/AuditContext';
-import { generateTataReport } from '@/services/tataEngine';
+import {
+  generateTataReport,
+  extractPdfHeader,
+  resolveTataTemplateType,
+  detectTemplateFromMasterExcel,
+} from '@/services/tataEngine';
 import { extractEmailDataFromExcel, buildEmailHtml } from '@/services/emailBuilder';
 import { downloadBlob } from '@/services/pdfService';
 import { FileDropzone } from '@/components/ui/file-dropzone';
@@ -53,6 +58,7 @@ export function TabGenerateReport() {
   } = useAudit();
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [autoDetectedNotice, setAutoDetectedNotice] = useState<string | null>(null);
 
   // Template options for TATA Capital (1:1 with templates.json)
   const templateOptions = [
@@ -183,9 +189,64 @@ export function TabGenerateReport() {
       setTemplateType('Collection');
       setReportPdf(samplePdf);
       setAnnexurePdf(null);
+      setAutoDetectedNotice('Auto-detected: Collection (Demo Sample TC-1049)');
       addLog('Sample files loaded. Audit ID: TC-1049 ready for generation.');
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleReportPdfSelect = async (file: File | null) => {
+    setReportPdf(file);
+    if (!file) {
+      setAutoDetectedNotice(null);
+      return;
+    }
+    if (client === 'TATA Capital') {
+      try {
+        const header = await extractPdfHeader(file);
+        if (header.agency_type) {
+          const detected = resolveTataTemplateType(header.agency_type);
+          setTemplateType(detected);
+          setAutoDetectedNotice(`Auto-detected: ${detected} (from Report PDF)`);
+          addLog(`[Template Auto-Detect] Found Agency Type: "${header.agency_type}" in PDF. Template set to "${detected}".`);
+        }
+      } catch (err) {
+        console.warn('PDF template detection error:', err);
+      }
+    }
+  };
+
+  const handleMasterFileSelect = async (file: File | null) => {
+    setMasterFile(file);
+    if (!file) return;
+    if (client === 'TATA Capital' && auditId.trim()) {
+      try {
+        const res = await detectTemplateFromMasterExcel(file, auditId.trim());
+        if (res) {
+          setTemplateType(res.detected);
+          setAutoDetectedNotice(`Auto-detected: ${res.detected} (${res.questionCount} questions in Master Excel)`);
+          addLog(`[Template Auto-Detect] Found ${res.questionCount} questions for Audit ID '${auditId.trim()}'. Template set to "${res.detected}".`);
+        }
+      } catch (err) {
+        console.warn('Master excel template detection error:', err);
+      }
+    }
+  };
+
+  const handleAuditIdChange = async (newId: string) => {
+    setAuditId(newId);
+    if (masterFile && newId.trim() && client === 'TATA Capital') {
+      try {
+        const res = await detectTemplateFromMasterExcel(masterFile, newId.trim());
+        if (res) {
+          setTemplateType(res.detected);
+          setAutoDetectedNotice(`Auto-detected: ${res.detected} (${res.questionCount} questions for '${newId.trim()}')`);
+          addLog(`[Template Auto-Detect] Found ${res.questionCount} questions for Audit ID '${newId.trim()}'. Template set to "${res.detected}".`);
+        }
+      } catch (err) {
+        console.warn('Master excel template detection error on ID change:', err);
+      }
     }
   };
 
@@ -303,7 +364,7 @@ export function TabGenerateReport() {
             <Input
               id="audit_id"
               value={auditId}
-              onChange={(e) => setAuditId(e.target.value)}
+              onChange={(e) => handleAuditIdChange(e.target.value)}
               placeholder="e.g. TC-1049"
               className="font-mono text-xs h-10 border-slate-200 focus:border-blue-600 focus:ring-blue-100 rounded-lg"
             />
@@ -321,7 +382,7 @@ export function TabGenerateReport() {
               id="master-excel-dropzone"
               accept=".xlsx, .xls"
               file={masterFile}
-              onFileSelect={setMasterFile}
+              onFileSelect={handleMasterFileSelect}
               title="Upload Master Excel File"
               subtitle="Drag & drop file here or click to browse (.xlsx, .xls)"
               icon={<FileSpreadsheet className="size-5" />}
@@ -367,10 +428,26 @@ export function TabGenerateReport() {
 
           {client === 'TATA Capital' && (
             <>
-              {/* Template Selector */}
+              {/* Template Selector with Auto-Detection Feedback */}
               <div className="space-y-1.5 max-w-md">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Template</Label>
-                <Select value={templateType} onValueChange={(val) => { if (val) setTemplateType(val); }}>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Template</Label>
+                  {autoDetectedNotice && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-full px-2 py-0.5">
+                      <CheckCircle2 className="size-3 text-emerald-600" />
+                      Auto-detected
+                    </span>
+                  )}
+                </div>
+                <Select
+                  value={templateType}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setTemplateType(val);
+                      setAutoDetectedNotice(`Manually selected: ${val}`);
+                    }
+                  }}
+                >
                   <SelectTrigger className="h-10 border-slate-200 text-xs">
                     <SelectValue placeholder="Select template" />
                   </SelectTrigger>
@@ -382,6 +459,11 @@ export function TabGenerateReport() {
                     ))}
                   </SelectContent>
                 </Select>
+                {autoDetectedNotice && (
+                  <p className="text-[11px] text-emerald-600 font-medium">
+                    {autoDetectedNotice}
+                  </p>
+                )}
               </div>
 
               {/* Upload Audit Report PDF */}
@@ -393,7 +475,7 @@ export function TabGenerateReport() {
                   id="report-pdf-dropzone"
                   accept=".pdf"
                   file={reportPdf}
-                  onFileSelect={setReportPdf}
+                  onFileSelect={handleReportPdfSelect}
                   title="Upload Audit Report PDF"
                   subtitle="Drag & drop file here or click to browse (.pdf)"
                   icon={<FileText className="size-5" />}
